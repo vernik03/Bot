@@ -121,8 +121,6 @@ def handle_text(message):
     if answer != '':
         bot.send_message(message.chat.id, answer)
             
-       
-      
     
 # Запускаем бота
 bot.polling(none_stop=True, interval=0)
