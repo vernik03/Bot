@@ -1,7 +1,0 @@
-TOKEN = '5305649926:AAETirjAU_QJ-Hd4Sv4_09I3qUkKmlf7jHM'
-
-PASSWORD = 'server03'
-
-IP = '178.159.224.36'
-
-USERNAME = '-root'
