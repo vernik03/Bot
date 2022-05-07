@@ -4,6 +4,7 @@ import mysql.connector
 from mysql.connector import Error
 from telebot import types
 from prettytable import PrettyTable, from_db_cursor
+from datetime import date
 
 from KEYS import *
 
@@ -65,6 +66,50 @@ def CreateQuery(connection, query, parameter=None, is_str=True):
     except Error as e :
         print(f"The error '{e}' occurred")
 
+def Make_Main():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1=types.KeyboardButton("Купити квиток")
+    item2=types.KeyboardButton("Афіша")
+    item4=types.KeyboardButton("Написати відгук")
+    item3=types.KeyboardButton("Адміністрування")
+    markup.row(item2)
+    markup.add(item1, item4)
+    markup.row(item3)
+    return markup
+
+def Make_Root():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1=types.KeyboardButton("Додати виставу")
+    item2=types.KeyboardButton("Додати співробітника")
+    item3=types.KeyboardButton("Змінити виставу")
+    item4=types.KeyboardButton("Звільнити співробітника")
+    item6=types.KeyboardButton("<- Назад")
+    markup.add(item1, item2)
+    markup.add(item3, item4)
+    markup.row(item6)
+    return markup
+
+def Make_Add_Perf():
+    markup= types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1=types.KeyboardButton("Додати персонажа")
+    item2=types.KeyboardButton("Додати театр")
+    item3=types.KeyboardButton("<- Назад")
+    markup.add(item1, item2)
+    markup.row(item3)
+    return markup
+
+def Make_Edit_Perf():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item4=types.KeyboardButton("Змінити назву")
+    item5=types.KeyboardButton("Змінити тривалість")
+    item1=types.KeyboardButton("Додати персонажа")
+    item2=types.KeyboardButton("Додати театр")
+    item3=types.KeyboardButton("<- Назад")
+    markup.add(item4, item5)
+    markup.add(item1, item2)
+    markup.row(item3)
+    return markup
+
 def handle_start_message(message):
     markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1=types.KeyboardButton("Купити квиток")
@@ -78,12 +123,19 @@ def handle_start_message(message):
     if not CreateQuery(connection,"SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s)", (message.chat.id,)):  
         CreateQuery(connection,"INSERT INTO visitor (visitor_name, phone, chat_id, is_root) VALUES (NULL, NULL, %s, FALSE)", (message.chat.id,))
 
+def query_markup(message, input_query, input_text):
+    global menu_item, handler_item, elems, temp, answer
+    markup = telebot.types.InlineKeyboardMarkup()
+    elems = CreateQuery(connection,input_query, None, False)
+    i = 1
+    for elem in elems:
+        markup.add(telebot.types.InlineKeyboardButton(text=elem, callback_data=i))
+        i+=1
+    bot.send_message(message.chat.id, text=input_text, reply_markup=markup)
+
+
 def handle_query(call):
-    global menu_item
-    global handler_item
-    global elems
-    global temp
-    global answer
+    global menu_item, handler_item, elems, temp, answer
 
     if handler_item == 'Perf':
         temp = elems[int(call.data)-1]
@@ -113,15 +165,7 @@ def handle_query(call):
     elif handler_item == 'Edit_Perf':
         temp = CreateQuery(connection,"SELECT perf_id FROM performance WHERE perf_name = %s", (elems[int(call.data)-1],), False)[0]
         menu_item = 'Edit_Perf_OK'
-        markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-        item4=types.KeyboardButton("Змінити назву")
-        item5=types.KeyboardButton("Змінити тривалість")
-        item1=types.KeyboardButton("Додати персонажа")
-        item2=types.KeyboardButton("Додати театр")
-        item3=types.KeyboardButton("<- Назад")
-        markup.add(item4, item5)
-        markup.add(item1, item2)
-        markup.row(item3)
+        markup=Make_Edit_Perf()
         bot.send_message(call.from_user.id,'Виберіть дію', reply_markup=markup)
         handler_item = ' '
 
@@ -131,59 +175,62 @@ def handle_query(call):
         bot.send_message(call.from_user.id, "Театр додано")
         handler_item = ' '
 
+    elif handler_item == 'Add_Staff':
+        temp = CreateQuery(connection,"SELECT theatre_id FROM theatre WHERE theatre_name = %s", (elems[int(call.data)-1],), False)[0]
+        bot.send_message(call.from_user.id, "Введіть прізвище та ім'я співробітника")
+        handler_item = ' '
+
+    elif handler_item == 'Delete_Staff':
+        temp = CreateQuery(connection,"SELECT theatre_id FROM theatre WHERE theatre_name = %s", (elems[int(call.data)-1],), False)[0]
+        markup = telebot.types.InlineKeyboardMarkup()
+        elems = CreateQuery(connection,"SELECT staff_name FROM staff WHERE theatre_id = %s", (temp,), False)
+        i = 1
+        for elem in elems:
+            markup.add(telebot.types.InlineKeyboardButton(text=elem, callback_data=i))
+            i+=1
+        bot.send_message(call.from_user.id, "Оберіть прізвище та ім'я співробітника", reply_markup=markup)
+        handler_item = 'Delete_Staff_ID'
+
+    elif handler_item == 'Delete_Staff_ID':
+        temp = CreateQuery(connection,"SELECT staff_id FROM staff WHERE staff_name = %s", (elems[int(call.data)-1],), False)[0]
+        CreateQuery(connection,"DELETE FROM staff WHERE staff_id = %s", (temp,))
+        bot.send_message(call.from_user.id, "Співробітника звільнено")
+        handler_item = ' '
+        menu_item = 'Root'
+
+
 def Root_menu(message):
-    global menu_item
-    global handler_item
-    global elems
-    global temp    
-    global answer
+    global menu_item, handler_item, elems, temp, answer
 
     if message.text.strip() == '<- Назад':
         menu_item = 'Main'
-        markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-        item1=types.KeyboardButton("Купити квиток")
-        item2=types.KeyboardButton("Афіша")
-        item4=types.KeyboardButton("Написати відгук")
-        item3=types.KeyboardButton("Адміністрування")
-        markup.row(item2)
-        markup.add(item1, item4)
-        markup.row(item3)
+        markup=Make_Main()
         bot.send_message(message.chat.id,'Назад до головного меню', reply_markup=markup)
     elif message.text.strip() == 'Додати виставу' :
         menu_item = 'Add_Perf'
         answer = 'Введіть назву вистави'
     elif message.text.strip() == 'Додати співробітника' :
-        answer = "В розробці"
+        query_markup(message, "SELECT theatre_name FROM theatre", "Оберіть назву театру")
+        menu_item = 'Add_Staff_Position'
+        handler_item = 'Add_Staff'
     elif message.text.strip() == 'Звільнити співробітника' :
-        answer = "В розробці"
+        query_markup(message, "SELECT theatre_name FROM theatre", "Оберіть назву театру")
+        menu_item = 'Delete_Staff_OK'
+        handler_item = 'Delete_Staff'
     elif message.text.strip() == 'Змінити виставу' :
-        menu_item = 'Edit_Perf'
-        markup = telebot.types.InlineKeyboardMarkup()
-        elems = CreateQuery(connection,"SELECT perf_name FROM performance",None, False)
-        i=1
-        handler_item = 'Edit_Perf'
-        for elem in elems:
-            markup.add(telebot.types.InlineKeyboardButton(text=elem, callback_data=i))
-            i+=1
-        bot.send_message(message.chat.id,"Оберіть назву вистави", reply_markup=markup)
+        menu_item = 'Edit_Perf'        
+        query_markup(message, "SELECT perf_name FROM performance", "Оберіть назву вистави")
     else :
         if message.text.strip() == PASSWORD :
             CreateQuery(connection,"SET SQL_SAFE_UPDATES = 0")
             CreateQuery(connection,"UPDATE visitor SET is_root = TRUE WHERE chat_id = %s", (message.chat.id,))
-        else :
+        elif message.text.strip() != PASSWORD and CreateQuery(connection,"SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s AND is_root = FALSE)", (message.chat.id,)):
             menu_item = 'Main'
-            answer = 'Неверный пароль'  
+            markup=Make_Main()
+            bot.send_message(message.chat.id,'Неверный пароль', reply_markup=markup) 
 
         if CreateQuery(connection,"SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s)", (message.chat.id,)):
-            markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-            item1=types.KeyboardButton("Додати виставу")
-            item2=types.KeyboardButton("Додати співробітника")
-            item3=types.KeyboardButton("Змінити виставу")
-            item4=types.KeyboardButton("Звільнити співробітника")
-            item6=types.KeyboardButton("<- Назад")
-            markup.add(item1, item2)
-            markup.add(item3, item4)
-            markup.row(item6)
+            markup=Make_Root()
             if message.text.strip() == 'Адміністрування' or message.text.strip() == PASSWORD:
                 bot.send_message(message.chat.id, '`<- Now you are root ->`', reply_markup=markup, parse_mode='MarkdownV2')
                 answer = ''
@@ -192,24 +239,12 @@ def Root_menu(message):
                 answer = ''    
 
 def Main_menu(message):
-    global menu_item
-    global handler_item
-    global elems
-    global temp
-    global answer
+    global menu_item, handler_item, elems, temp, answer
 
     if message.text.strip() == 'Адміністрування' :
         if CreateQuery(connection,"SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s AND is_root = TRUE)", (message.chat.id,)):                
             menu_item = 'Root'
-            markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-            item1=types.KeyboardButton("Додати виставу")
-            item2=types.KeyboardButton("Додати співробітника")
-            item3=types.KeyboardButton("Змінити виставу")
-            item4=types.KeyboardButton("Звільнити співробітника")
-            item6=types.KeyboardButton("<- Назад")
-            markup.add(item1, item2)
-            markup.add(item3, item4)
-            markup.row(item6)
+            markup=Make_Root()
             bot.send_message(message.chat.id, '`<- Now you are root ->`', reply_markup=markup, parse_mode='MarkdownV2')
             answer = ''
         else :
@@ -229,13 +264,11 @@ def Main_menu(message):
         bot.send_message(message.chat.id, text="Оберіть виставу, яку ви відвідали", reply_markup=markup)
 
 def handle_message(message):
-    global menu_item
-    global handler_item
-    global elems
-    global temp
-    global answer
+    global menu_item, handler_item, elems, temp, answer
 
     if message.chat.type == 'private':
+        
+        
         if menu_item == 'Name':
             CreateQuery(connection,"UPDATE visitor SET visitor_name = %s WHERE chat_id = %s", (message.text, message.chat.id))
             menu_item = 'Main'
@@ -255,6 +288,23 @@ def handle_message(message):
             CreateQuery(connection,"UPDATE visitor SET phone = %s WHERE chat_id = %s", (message.text, message.chat.id))
             menu_item = 'Perf'
         
+        if menu_item == 'Add_Staff_Position':
+            CreateQuery(connection,"SET foreign_key_checks = 0",None)
+            CreateQuery(connection,"INSERT INTO staff (staff_name, theatre_id, position, hirirng_date) VALUES (%s, %s, Null, %s)", (message.text, temp, date.today()))
+            temp = CreateQuery(connection,"SELECT staff_id FROM staff WHERE staff_name = %s", (message.text,), False)[0]
+            bot.send_message(message.chat.id,'Введіть посаду співробітника')
+            menu_item = 'Add_Staff_Salary'
+        elif menu_item == 'Add_Staff_Salary':            
+            CreateQuery(connection,"UPDATE staff SET position = %s WHERE staff_id = %s", (message.text, temp))
+            bot.send_message(message.chat.id,'Введіть заробітну плату співробітника')
+            menu_item = 'Add_Staff_OK'
+        elif menu_item == 'Add_Staff_OK':
+            CreateQuery(connection,"INSERT INTO salary (staff_id, salary) VALUES (%s, %s)", (temp, message.text))
+            CreateQuery(connection,"SET foreign_key_checks = 1",None)
+            bot.send_message(message.chat.id,'Співробітника додано')
+            menu_item ='Root'
+            return
+       
             
         if menu_item == 'Add_Perf':
             CreateQuery(connection,"INSERT INTO performance (perf_name, duration, number_of_parts) VALUES (%s, NULL, NULL)", (message.text,))
@@ -299,13 +349,7 @@ def handle_message(message):
                 answer = "Введіть ім'я персонажа"
             elif message.text.strip() == 'Додати театр' :
                 handler_item = 'Edit_Perf_Theatre'
-                markup = telebot.types.InlineKeyboardMarkup()
-                elems = CreateQuery(connection,"SELECT theatre_name FROM theatre", None, False)
-                i = 1
-                for elem in elems:
-                    markup.add(telebot.types.InlineKeyboardButton(text=elem, callback_data=i))
-                    i+=1
-                bot.send_message(message.chat.id, text="Оберіть назву театру", reply_markup=markup)
+                query_markup(message, "SELECT theatre_name FROM theatre", "Оберіть назву театру")
             elif message.text.strip() == 'Змінити назву' :
                 menu_item ='Edit_Perf_Name'
                 answer = "Введіть нову назву вистави"
@@ -318,27 +362,11 @@ def handle_message(message):
                 answer = "Виставу видалено"
             elif message.text.strip() == '<- Назад' :
                 menu_item ='Root'
-                markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-                item1=types.KeyboardButton("Додати виставу")
-                item2=types.KeyboardButton("Додати співробітника")
-                item3=types.KeyboardButton("Змінити виставу")
-                item4=types.KeyboardButton("Звільнити співробітника")
-                item6=types.KeyboardButton("<- Назад")
-                markup.add(item1, item2)
-                markup.add(item3, item4)
-                markup.row(item6)
+                markup=Make_Root()
                 bot.send_message(message.chat.id,'Назад до консолі керування', reply_markup=markup)
                 message.text = 'Адміністрування'
             else:
-                markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-                item4=types.KeyboardButton("Змінити назву")
-                item5=types.KeyboardButton("Змінити тривалість")
-                item1=types.KeyboardButton("Додати персонажа")
-                item2=types.KeyboardButton("Додати театр")
-                item3=types.KeyboardButton("<- Назад")
-                markup.add(item4, item5)
-                markup.add(item1, item2)
-                markup.row(item3)
+                markup=Make_Edit_Perf()
                 bot.send_message(message.chat.id,'Виберіть дію', reply_markup=markup)
         
         if menu_item == 'Add_Perf_OK':
@@ -347,36 +375,15 @@ def handle_message(message):
                 answer = "Введіть ім'я персонажа"
             elif message.text.strip() == 'Додати театр' :
                 handler_item = 'Edit_Perf_Theatre'
-                markup = telebot.types.InlineKeyboardMarkup()
-                elems = CreateQuery(connection,"SELECT theatre_name FROM theatre", None, False)
-                i = 1
-                for elem in elems:
-                    markup.add(telebot.types.InlineKeyboardButton(text=elem, callback_data=i))
-                    i+=1
-                bot.send_message(message.chat.id, text="Оберіть назву театру", reply_markup=markup)
+                query_markup(message, "SELECT theatre_name FROM theatre", "Оберіть назву театру")
             elif message.text.strip() == '<- Назад' :
                 menu_item ='Root'
-                markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-                item1=types.KeyboardButton("Додати виставу")
-                item2=types.KeyboardButton("Додати співробітника")
-                item3=types.KeyboardButton("Змінити виставу")
-                item4=types.KeyboardButton("Звільнити співробітника")
-                item6=types.KeyboardButton("<- Назад")
-                markup.add(item1, item2)
-                markup.add(item3, item4)
-                markup.row(item6)
+                markup=Make_Root()
                 bot.send_message(message.chat.id,'Назад до консолі керування', reply_markup=markup)
                 message.text = 'Адміністрування'
             else:
-                markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
-                item1=types.KeyboardButton("Додати персонажа")
-                item2=types.KeyboardButton("Додати театр")
-                item3=types.KeyboardButton("<- Назад")
-                markup.add(item1, item2)
-                markup.row(item3)
-                bot.send_message(message.chat.id,'Виберіть дію', reply_markup=markup)
-        
-
+                markup=Make_Add_Perf()
+                bot.send_message(message.chat.id,'Оберіть дію', reply_markup=markup)
 
         if menu_item == 'Root':
             Root_menu(message)
