@@ -1,0 +1,10 @@
+SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s);
+SELECT theatre_name FROM theatre;
+SELECT theatre_id FROM theatre WHERE theatre_name = %s;
+SELECT EXISTS(SELECT performance.perf_name as 'Вистава',theatre.theatre_name as 'Театри' FROM  performance, theatre, performance_theatre WHERE performance_theatre.perf_id = performance.perf_id AND performance_theatre.theatre_id = theatre.theatre_id AND theatre.theatre_id = %s);
+SELECT performance.perf_name as 'Вистава',theatre.theatre_name as 'Театри' FROM  performance, theatre, performance_theatre WHERE performance_theatre.perf_id = performance.perf_id AND performance_theatre.theatre_id = theatre.theatre_id AND theatre.theatre_id = %s;
+SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s AND is_root = TRUE);
+SELECT perf_name FROM performance;
+SELECT perf_id FROM performance WHERE perf_name = %s;
+SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s AND is_root = FALSE);
+SELECT EXISTS(SELECT visitor_id FROM visitor WHERE chat_id = %s);
